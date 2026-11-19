@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RMAS Costing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: app shell — fixed left sidebar (logo, nav, signed-in user) + content area with page header, filter bar and one page at a time */
+:root{
+  --bg:#f3f4f6; --surface:#ffffff; --surface-2:#f3f5f9; --line:#e3e6ec; --side:#ffffff; --side-fg:#1f2937; --side-muted:#6b7280; --side-active:#e8efff; --side-active-fg:#1d4ed8;
+  --top-a:#0a1128; --top-b:#1b2f6b; --top-fg:#ffffff; --top-tab:rgb(255 255 255 / .14);
+  --fg:#111827; --muted:#6b7280; --accent:#2557d6; --accent-soft:#e8efff; --accent-fg:#ffffff;
+  --warn:#b45309; --warn-soft:#fef3c7; --bad:#dc2626; --bad-soft:#fee2e2; --good:#15803d; --good-soft:#dcfce7;
+  --shadow:0 1px 2px rgb(16 24 40 / .05),0 1px 3px rgb(16 24 40 / .06);
+  --f-display:"Plus Jakarta Sans",system-ui,sans-serif; --f-body:"Inter",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1020; --surface:#121a2e; --surface-2:#18223a; --line:#26314d; --side:#0f1628; --side-fg:#dbe3f4; --side-muted:#8b97b3; --side-active:#1c2b52; --side-active-fg:#9db8ff;
+  --top-a:#060a17; --top-b:#13224f; --top-fg:#ffffff; --top-tab:rgb(255 255 255 / .14);
+  --fg:#e6ebf5; --muted:#97a3bd; --accent:#6b93ff; --accent-soft:#1c2b52; --accent-fg:#06102a;
+  --warn:#f5b453; --warn-soft:#3a2a10; --bad:#f87171; --bad-soft:#3d1717; --good:#6ee79a; --good-soft:#123222;
+  --shadow:0 1px 2px rgb(0 0 0 / .3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1020; --surface:#121a2e; --surface-2:#18223a; --line:#26314d; --side:#0f1628; --side-fg:#dbe3f4; --side-muted:#8b97b3; --side-active:#1c2b52; --side-active-fg:#9db8ff;
+  --top-a:#060a17; --top-b:#13224f; --top-fg:#ffffff; --top-tab:rgb(255 255 255 / .14);
+  --fg:#e6ebf5; --muted:#97a3bd; --accent:#6b93ff; --accent-soft:#1c2b52; --accent-fg:#06102a;
+  --warn:#f5b453; --warn-soft:#3a2a10; --bad:#f87171; --bad-soft:#3d1717; --good:#6ee79a; --good-soft:#123222;
+  --shadow:0 1px 2px rgb(0 0 0 / .3); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--top-a)}
+/* app bar (dark navy strip with module tabs) */
+.appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:8;height:48px;background:linear-gradient(90deg,var(--top-a),var(--top-b));color:var(--top-fg);display:flex;align-items:center;gap:16px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+.appbar .brand{display:flex;align-items:center;gap:9px;font:800 16px var(--f-display);letter-spacing:-.01em;white-space:nowrap}
+.appbar .brand em{font-style:normal;color:#7fa6ff}
+.tabs{margin-left:auto;display:flex;gap:4px;overflow-x:auto;min-width:0}
+.tabs a{color:#dfe7ff;text-decoration:none;font:600 14px var(--f-body);padding:6px 12px;border-radius:7px;white-space:nowrap}
+.tabs a:hover{background:rgb(255 255 255 / .08)}
+.tabs a[aria-current="page"]{background:var(--top-tab);color:#fff}
+.app{display:grid;grid-template-columns:256px minmax(0,1fr);min-height:calc(100% - 48px)}
+/* sidebar (light) */
+.side{background:var(--side);color:var(--side-fg);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;padding:20px 16px calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));position:sticky;top:calc(48px + env(safe-area-inset-top,0px));height:calc(100vh - 48px - env(safe-area-inset-top,0px));overflow-y:auto}
+.logo{display:flex;align-items:center;gap:12px;padding:2px 4px}
+.logo svg{flex:none;filter:drop-shadow(0 2px 4px rgb(37 87 214 / .25))}
+.logo b{font-family:var(--f-display);font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--fg);display:block;line-height:1.2}
+.logo small{font-size:12px;color:var(--muted)}
+.me{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:4px;background:var(--surface-2)}
+.me label{font-size:12px;color:var(--muted)}
+.me .who{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.me select{border:0;background:transparent;padding:0;font-weight:700;color:var(--fg);max-width:150px}
+.role-pill{font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--side-active-fg);padding:1px 7px;border-radius:5px}
+.nav{display:grid;gap:2px}
+.nav a{display:flex;align-items:center;gap:12px;color:var(--side-fg);text-decoration:none;padding:9px 12px;border-radius:8px;font-weight:500;font-size:15px}
+.nav a svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.8}
+.nav a:hover{background:var(--surface-2)}
+.nav a[aria-current="page"]{background:var(--side-active);color:var(--side-active-fg);font-weight:700}
+.nav a[aria-current="page"] svg{opacity:1}
+.nav a .cnt{margin-left:auto;font-size:11px;font-weight:700;background:var(--bad-soft);color:var(--bad);padding:1px 7px;border-radius:9px}
+.nav a .cnt[data-zero]{background:var(--surface-2);color:var(--muted)}
+.nav-label{font-size:12px;font-weight:600;color:var(--muted);padding:0 12px;margin-top:10px}
+/* content */
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--line);padding-block:16px;padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
+.topbar .ttl{margin-right:auto;min-width:0}
+.topbar h1{font-family:var(--f-display);font-size:22px;font-weight:800;margin:0;letter-spacing:-.01em}
+.topbar .ttl p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.status-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--muted);white-space:nowrap}
+.status-pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters select{min-width:150px}
+.content{padding-block:28px 48px;padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px));display:grid;gap:20px;align-content:start;max-width:1440px;width:100%}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--muted);padding:6px 12px;font:600 13px var(--f-body);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+select,input,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px;min-width:0}
+select:focus-visible,input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 14px;border-radius:7px;font:600 13px var(--f-body);cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:hover{filter:brightness(.97)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:600 12px var(--f-body);cursor:pointer;text-decoration:underline}
+/* tiles + panels */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.tile .val{font-family:var(--f-display);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.tile .sub{font-size:12px;color:var(--muted)}
+.no-bud{color:var(--muted);font-size:14px!important;font-family:var(--f-body)!important;font-weight:500!important;padding-block:6px}
+.meter{height:6px;background:var(--surface-2);border-radius:3px;margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)} .meter i.warn{background:var(--warn)} .meter i.bad{background:var(--bad)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0}
+.panel>h2{font-family:var(--f-display);font-size:15px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.panel>h2 small{font:400 12px var(--f-body);color:var(--muted)}
+.pad{padding:14px 16px}
+.bars{display:grid;gap:10px}
+.bar{display:grid;grid-template-columns:100px minmax(0,1fr) 96px;gap:10px;align-items:center;font-size:13px}
+.bar .track{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden;position:relative}
+.bar .track i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:5px}
+.bar .track b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--fg);opacity:.55}
+.bar .amt{text-align:right;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.legend{font-size:12px;color:var(--muted);margin-top:10px;display:flex;gap:14px;flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--accent);margin-right:6px;vertical-align:-1px}
+.legend span.tgt::before{width:2px;background:var(--fg);opacity:.55}
+.weeks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:end;height:150px;padding-top:8px}
+.wk{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.wk .col{width:100%;max-width:44px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.wk .col.now{background:var(--warn)}
+.wk .n{font-family:var(--f-mono);font-size:11px;font-variant-numeric:tabular-nums}
+.wk .d{font-size:11px;color:var(--muted);text-align:center}
+/* tables */
+.tbl-wrap{overflow-x:auto}
+.scroll-box{max-height:600px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface-2)}
+.scroll-box th{position:sticky;top:0;z-index:1}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)} tr.click:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.sub-t{color:var(--muted);font-size:12px}
+.purpose{color:var(--muted);font-size:12px;max-width:320px}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.chip.ok{background:var(--good-soft);color:var(--good)} .chip.wait{background:var(--warn-soft);color:var(--warn)}
+.chip.late{background:var(--surface-2);color:var(--warn);border:1px solid var(--warn)}
+.chip.dup{background:var(--bad-soft);color:var(--bad)}
+.chip.ce{background:var(--accent-soft);color:var(--accent)}
+.tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;white-space:nowrap}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.toolbar input[type=search]{flex:1 1 200px}
+.empty{padding:32px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);font-size:14px;margin-bottom:2px}
+/* drawers + dialogs */
+.overlay{position:fixed;inset:0;background:rgb(0 0 0 / .4);z-index:20;display:flex;justify-content:flex-end}
+.drawer{background:var(--surface);width:min(540px,100%);height:100%;overflow-y:auto;padding:20px max(20px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) 20px;padding-top:calc(20px + env(safe-area-inset-top,0px));display:grid;gap:14px;align-content:start}
+.drawer h3{font-family:var(--f-display);font-size:18px;margin:0}
+.field{display:grid;gap:4px}
+.field label{font-size:12px;font-weight:600}
+.req{color:var(--bad)}
+.hint{font-size:12px;color:var(--muted)}
+.err{font-size:12px;color:var(--bad)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;background:var(--surface-2)}
+.drop.has{border-style:solid;border-color:var(--accent);color:var(--fg)}
+.drop img{max-height:160px;border-radius:4px;display:block;margin:8px auto 0}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding-top:6px}
+.note{font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:7px;padding:8px 10px}
+.warn-box{background:var(--warn-soft);border-radius:7px;padding:10px 12px;font-size:13px}
+.warn-box.bad{background:var(--bad-soft)} .warn-box.ce{background:var(--accent-soft)}
+table.split{width:auto;min-width:260px;margin-top:4px}
+table.split td{padding:3px 12px 3px 0;border:0;font-size:13px}
+.bud-tbl input{width:100%;min-width:90px;text-align:right;font-family:var(--f-mono);font-size:13px;padding:6px 8px}
+.bud-tbl td{padding:6px}
+.lb{position:fixed;inset:0;background:rgb(0 0 0 / .55);z-index:25;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.lb-card{background:var(--surface);border-radius:12px;width:min(780px,100%);max-height:100%;overflow:hidden;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr)}
+.lb-card .big{background:var(--surface-2);padding:18px;display:flex;align-items:center;justify-content:center;min-height:320px}
+.lb-card .big img{max-height:72vh;max-width:100%;border-radius:4px}
+.lb-card .info{padding:18px;display:grid;gap:12px;align-content:start;max-height:88vh;overflow-y:auto}
+.lb-card .info h3{font-family:var(--f-display);margin:0;font-size:17px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.hist{margin:0;padding-left:18px;display:grid;gap:6px;font-size:12px}
+.hist span{color:var(--muted)}
+.pdf{font:600 13px var(--f-mono);color:var(--bad);border:2px solid var(--bad);border-radius:4px;padding:10px 12px}
+/* gallery */
+.gal-groups{display:grid;gap:20px;padding:16px}
+.gal-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.gal-head h3{font-family:var(--f-display);font-size:14px;margin:0}
+.gal-head span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.thumb{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0;cursor:pointer;text-align:left;font:inherit;color:inherit;display:grid;overflow:hidden}
+.thumb:hover{border-color:var(--accent)}
+.thumb .pic{aspect-ratio:3/4;max-width:100%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.thumb .pic img{width:100%;height:100%;object-fit:cover}
+.thumb .meta{padding:7px 9px;display:grid;gap:1px;font-size:12px;border-top:1px solid var(--line)}
+.thumb .meta b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.thumb .meta span{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* email */
+.email-grid{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr)}
+.sched{padding:16px;border-right:1px solid var(--line);display:grid;gap:14px;align-content:start}
+.count{font-family:var(--f-display);font-size:36px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.mail{padding:16px;min-width:0}
+.mail .hdr{font-size:12px;color:var(--muted);display:grid;gap:2px;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:12px;overflow-wrap:anywhere}
+.mail .hdr b{color:var(--fg);font-weight:600}
+.mail p{margin:0 0 10px;max-width:70ch}
+.mail table{margin:8px 0 14px}
+.mail .cta{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.mail .cta span{padding:7px 14px;border-radius:7px;font-weight:600;font-size:13px}
+.mail .cta .ok{background:var(--accent);color:var(--accent-fg)} .mail .cta .no{border:1px solid var(--line)}
+.team-tbl input{width:100%}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:7px;font-weight:600;z-index:30}
+/* --- card + control styling to match the team's existing tools --- */
+select,input,textarea{border-radius:8px;border-color:#d4d9e2}
+.filters select,.topbar .btn{height:38px}
+.btn{border-radius:8px;padding:8px 14px}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.primary{box-shadow:0 1px 2px rgb(37 87 214 / .3)}
+.seg{border-radius:8px}
+.tile{border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);border-color:var(--line);display:grid;gap:4px;position:relative}
+.tile .t-lbl{font-size:14px;color:var(--fg);font-weight:500;padding-right:44px}
+.tile .val{font-family:var(--f-display);font-size:30px;font-weight:800;letter-spacing:-.01em;margin-top:14px;line-height:1.1}
+.tile .sub{font-size:13px;font-weight:600;margin-top:6px}
+.tile .sub.g{color:var(--good)} .tile .sub.r{color:var(--bad)} .tile .sub.m{color:var(--muted);font-weight:500}
+.ico{position:absolute;top:16px;right:18px;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ico.blue{background:var(--accent-soft);color:var(--accent)} .ico.red{background:var(--bad-soft);color:var(--bad)} .ico.amber{background:var(--warn-soft);color:var(--warn)} .ico.green{background:var(--good-soft);color:var(--good)}
+.no-bud{font-size:18px!important;font-family:var(--f-display)!important;font-weight:700!important;color:var(--muted);padding:0!important}
+.panel{border-radius:14px;box-shadow:var(--shadow)}
+.panel>h2{font-family:var(--f-display);font-size:17px;font-weight:800;padding:20px 20px 4px;border-bottom:0;display:flex;align-items:flex-start}
+.panel>h2 small{display:block;width:100%;order:3;font:400 13px var(--f-body);color:var(--muted);margin-top:-6px}
+.panel>.toolbar{border-top:1px solid var(--line);margin-top:12px}
+.pad{padding:16px 20px 20px}
+th{background:transparent;border-bottom:1px solid var(--line);color:var(--muted)}
+/* horizontal bar chart with axis */
+.hchart{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px}
+.hchart .lab{font-size:13px;color:var(--fg);text-align:right;height:31px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap}
+.hchart .plot{position:relative;border-left:1px solid #cfd5df}
+.hchart .row{height:31px;display:flex;align-items:center;position:relative;z-index:1}
+.hchart .row i{display:block;height:21px;background:var(--accent);border-radius:0 3px 3px 0;min-width:0}
+.hchart .row i.over{background:var(--bad)}
+.hchart .row b{position:absolute;top:2px;bottom:2px;width:2px;background:var(--fg);opacity:.6}
+.hchart .row span{font:500 11px var(--f-mono);color:var(--muted);margin-left:6px;white-space:nowrap}
+.hchart .grid{position:absolute;inset:0;display:flex;pointer-events:none}
+.hchart .grid div{position:absolute;top:0;bottom:0;border-left:1px solid var(--line)}
+.hchart .axis{grid-column:2;position:relative;height:22px;border-top:1px solid #cfd5df}
+.hchart .axis span{position:absolute;top:4px;transform:translateX(-50%);font:400 11px var(--f-body);color:var(--muted);white-space:nowrap}
+@media (max-width:1080px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:minmax(0,1fr)}.email-grid{grid-template-columns:minmax(0,1fr)}.sched{border-right:0;border-bottom:1px solid var(--line)}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));padding-top:calc(10px + env(safe-area-inset-top,0px));overflow-x:auto}
+  .tabs,.side .logo,.nav-label,.me label,.nav a .cnt{display:none}
+  .side{border-right:0;border-bottom:1px solid var(--line)}
+  .me{padding:4px 8px}
+  .nav{display:flex;gap:2px}
+  .nav a{padding:7px 9px;white-space:nowrap}
+  .me{margin:0 0 0 auto;border:0;padding:0}
+  .topbar,.content{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+@media (max-width:640px){.lb-card{grid-template-columns:minmax(0,1fr);overflow-y:auto}.lb-card .big{min-height:220px}.lb-card .info{max-height:none}}
+@media (max-width:520px){.row2{grid-template-columns:1fr}.bar{grid-template-columns:84px minmax(0,1fr) 84px}.tile .val{font-size:20px}}
+@media (prefers-reduced-motion:no-preference){.meter i,.bar .track i,.wk .col{transition:width .3s,height .3s}}
+/* live version additions */
+.status-pill.live::before{background:var(--good)}
+.status-pill.off::before{background:var(--bad)}
+.boot{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+.boot-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:28px 32px;max-width:460px;display:grid;gap:10px;justify-items:center}
+.boot-card h2{font-family:var(--f-display);font-size:18px;margin:0}
+.boot-card p{margin:0;color:var(--muted)}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--accent-soft);border-top-color:var(--accent);animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.me b{font-weight:700}
+.thumb .pic .ph{font:600 12px var(--f-body);color:var(--muted)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div class="boot" id="boot"><div class="boot-card"><div class="spin" aria-hidden="true"></div><h2 id="boot-title">Loading RMAS Costing</h2><p id="boot-msg">Getting the latest data from the Google Sheet…</p>
+  <form id="key-form" hidden style="display:grid;gap:8px;width:100%;margin-top:6px"><label for="key-input" class="hint" style="text-align:left">Access key</label><input id="key-input" autocomplete="off" placeholder="Paste your access key"><button class="btn primary" type="submit">Open RMAS Costing</button></form></div></div>
+<div class="appbar">
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 34 34" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b6ff0"/><stop offset="1" stop-color="#1d3fae"/></linearGradient></defs><rect width="34" height="34" rx="8" fill="url(#lg1)"/><path d="M10 7.5h14v19l-2.33-1.6-2.34 1.6L17 24.9l-2.33 1.6-2.34-1.6L10 26.5z" fill="#fff"/><rect x="13" y="16" width="2.2" height="6" rx=".6" fill="#2557d6"/><rect x="16.4" y="13" width="2.2" height="9" rx=".6" fill="#2557d6"/><rect x="19.8" y="10.5" width="2.2" height="11.5" rx=".6" fill="#2557d6"/></svg>RMAS<em>Costing</em></div>
+  <nav class="tabs" aria-label="Sections">
+    <a href="#dashboard" data-tab="dashboard">Dashboard</a>
+    <a href="#receipts" data-tab="receipts">Receipts</a>
+    <a href="#gallery" data-tab="gallery">Gallery</a>
+    <a href="#budget" data-tab="budget">Budget</a>
+    <a href="#email" data-tab="email">Approval email</a>
+  </nav>
+</div>
+<div class="app">
+  <aside class="side">
+    <div class="logo">
+      <svg width="46" height="46" viewBox="0 0 34 34" aria-hidden="true"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b6ff0"/><stop offset="1" stop-color="#1d3fae"/></linearGradient></defs><rect width="34" height="34" rx="8" fill="url(#lg2)"/><path d="M10 7.5h14v19l-2.33-1.6-2.34 1.6L17 24.9l-2.33 1.6-2.34-1.6L10 26.5z" fill="#fff"/><rect x="13" y="16" width="2.2" height="6" rx=".6" fill="#2557d6"/><rect x="16.4" y="13" width="2.2" height="9" rx=".6" fill="#2557d6"/><rect x="19.8" y="10.5" width="2.2" height="11.5" rx=".6" fill="#2557d6"/></svg>
+      <div><b>RMAS Costing</b><small>Merchandising expenses</small></div>
+    </div>
+    <div class="me">
+      <label>Logged in as</label>
+      <div class="who"><b id="me-name">—</b><span class="role-pill" id="me-role"></span></div>
+      <button type="button" class="linkbtn" id="logout" style="justify-self:start">Switch user</button>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <span class="nav-label">Overview</span>
+      <a href="#dashboard" data-page="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
+      <a href="#receipts" data-page="receipts"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>Receipts<span class="cnt" id="n-receipts">0</span></a>
+      <a href="#gallery" data-page="gallery"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>Receipt gallery</a>
+      <span class="nav-label">Budget</span>
+      <a href="#budget" data-page="budget"><svg viewBox="0 0 24 24"><path d="M3 7h18v12H3z"/><path d="M3 7l2-3h14l2 3"/><circle cx="12" cy="13" r="2.5"/></svg>Approved budget</a>
+      <a href="#email" data-page="email"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Approval email</a>
+      <span class="nav-label">Admin</span>
+      <a href="#audit" data-page="audit"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Audit trail</a>
+      <a href="#team" data-page="team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.6c2.8.2 5 2 5 5"/></svg>Team</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="ttl"><h1 id="page-title">Dashboard</h1><p id="page-sub">Overview of RMAS merchandising spend</p></div>
+      <button class="btn primary" id="open-upload"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Upload receipt</button>
+      <div class="filters" id="filters">
+        <div class="seg" role="group" aria-label="Period">
+          <button id="v-week" aria-pressed="false">Weekly</button>
+          <button id="v-month" aria-pressed="true">Monthly</button>
+        </div>
+        <select id="f-month" aria-label="Month"></select>
+        <select id="f-week" aria-label="Week" hidden></select>
+        <select id="f-region" aria-label="Region"></select>
+        <select id="f-bu" aria-label="Business unit"></select>
+      </div>
+      <span class="status-pill" id="sync-pill">Connecting…</span>
+    </header>
+
+    <main class="content">
+      <!-- DASHBOARD -->
+      <section data-view="dashboard">
+        <div style="display:grid;gap:20px">
+          <div class="tiles" id="tiles"></div>
+          <div class="grid2">
+            <div class="panel"><h2>Spend by region <small id="reg-cap"></small></h2>
+              <div class="pad"><div class="bars" id="by-region"></div>
+                <div class="legend"><span>Spent</span><span class="tgt">Approved budget (shown once approved)</span></div></div></div>
+            <div class="panel"><h2>Spend by BU <small id="bu-cap"></small></h2>
+              <div class="pad"><div class="bars" id="by-bu"></div>
+                <div class="hint" style="margin-top:12px">CE expenses are split into AV, HA and AC.</div></div></div>
+          </div>
+          <div class="grid2">
+            <div class="panel"><h2>Weekly trend <small id="wk-cap"></small></h2><div class="pad"><div class="weeks" id="weeks"></div></div></div>
+            <div class="panel"><h2>Latest receipts <a href="#receipts" class="linkbtn" style="font-size:12px">View all</a></h2>
+              <div class="tbl-wrap"><table><tbody id="recent"></tbody></table></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RECEIPTS -->
+      <section data-view="receipts" hidden>
+        <div class="panel">
+          <h2>Receipts <small id="rc-cap"></small></h2>
+          <div class="toolbar">
+            <input id="search" type="search" placeholder="Search vendor, OR no., outlet, purpose, uploader…">
+            <button class="btn" id="exp-xlsx"><svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg>Excel</button>
+            <button class="btn" id="exp-pdf"><svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg>PDF</button>
+          </div>
+          <div class="tbl-wrap scroll-box"><table>
+            <thead><tr><th>Date</th><th>Vendor / Purpose</th><th>Region · BU</th><th>Category</th><th>Uploaded by</th><th class="num">Amount</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- GALLERY -->
+      <section data-view="gallery" hidden>
+        <div class="panel">
+          <h2>Receipt gallery <small id="gal-cap"></small></h2>
+          <div class="toolbar">
+            <span class="lbl">Group by</span>
+            <div class="seg" role="group" aria-label="Group receipts by">
+              <button id="g-date" aria-pressed="true">Date</button>
+              <button id="g-region" aria-pressed="false">Region</button>
+              <button id="g-bu" aria-pressed="false">BU</button>
+            </div>
+            <span class="hint">Follows the period, region and BU filters above</span>
+          </div>
+          <div class="gal-groups" id="gallery"></div>
+        </div>
+      </section>
+
+      <!-- BUDGET -->
+      <section data-view="budget" hidden>
+        <div style="display:grid;gap:20px">
+          <div class="panel">
+            <h2>Approved budgets <button class="btn primary" id="open-budget">Enter approved budget</button></h2>
+            <div class="tbl-wrap"><table>
+              <thead><tr><th>Month</th><th>Approved by</th><th>Date approved</th><th class="num">AV</th><th class="num">HA</th><th class="num">AC</th><th class="num">Total</th><th></th></tr></thead>
+              <tbody id="bud-rows"></tbody>
+            </table></div>
+          </div>
+          <div class="note">Enter a month's budget only after the RMAS Head approves it. It becomes the baseline the dashboard compares spending against. Months without an approved budget show spending only.</div>
+        </div>
+      </section>
+
+      <!-- EMAIL -->
+      <section data-view="email" hidden>
+        <div class="panel">
+          <h2>Budget approval email <small>Sends automatically 7 days before month end</small></h2>
+          <div class="email-grid"><div class="sched" id="sched"></div><div class="mail" id="mail"></div></div>
+        </div>
+      </section>
+
+      <!-- AUDIT -->
+      <section data-view="audit" hidden>
+        <div class="panel">
+          <h2>Audit trail <small id="audit-cap"></small></h2>
+          <div class="toolbar">
+            <input id="audit-q" type="search" placeholder="Search name, action, OR no.…">
+            <select id="audit-act" aria-label="Action"><option value="">All actions</option><option>Uploaded receipt</option><option>Saved approved budget</option><option>Exported report</option><option>Updated team</option></select>
+          </div>
+          <div class="tbl-wrap scroll-box"><table>
+            <thead><tr><th>Date &amp; time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+            <tbody id="audit-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- TEAM -->
+      <section data-view="team" hidden>
+        <form class="panel" id="team-form" novalidate>
+          <h2>RMAS team <small>7 users: the RMAS Head and one RMAS user per region</small></h2>
+          <div class="tbl-wrap"><table class="team-tbl">
+            <thead><tr><th style="width:40px">#</th><th>Name</th><th>Role</th><th>Region</th><th>Email</th><th>Personal link</th></tr></thead>
+            <tbody id="team-rows"></tbody>
+          </table></div>
+          <div class="toolbar" style="border-bottom:0;border-top:1px solid var(--line);justify-content:space-between">
+            <span class="hint">Each user opens RMAS Costing with their own personal link. Regional users upload for their own region. The RMAS Head receives the budget approval email and the rest of the team is copied.</span>
+            <button class="btn primary" type="submit">Save team</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Upload drawer -->
+<div class="overlay" id="overlay" hidden>
+  <form class="drawer" id="upload-form" novalidate>
+    <h3>Upload receipt</h3>
+    <div class="field">
+      <label>Receipt photo or PDF <span class="req">*</span></label>
+      <label class="drop" id="drop" for="u-file"><span id="drop-txt">Click to choose a file or drag it here<br><small>JPG, PNG or PDF, up to 10 MB</small></span></label>
+      <input type="file" id="u-file" accept="image/*,application/pdf" hidden>
+      <input type="file" id="u-cam" accept="image/*" capture="environment" hidden>
+      <button type="button" class="btn" id="cam-btn">Take a photo</button>
+      <div class="err" id="e-file"></div>
+    </div>
+    <div class="field"><label>Uploaded by</label><div class="note" id="u-by-name"></div></div>
+    <div class="row2">
+      <div class="field"><label for="u-date">Receipt date <span class="req">*</span></label><input type="date" id="u-date"><div class="err" id="e-date"></div></div>
+      <div class="field"><label for="u-amt">Amount (₱) <span class="req">*</span></label><input type="number" id="u-amt" min="0" step="0.01" inputmode="decimal" placeholder="0.00"><div class="err" id="e-amt"></div></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="u-region">Region <span class="req">*</span></label><select id="u-region"></select><div class="hint" id="u-reg-hint"></div></div>
+      <div class="field"><label for="u-bu">Business unit (BU) <span class="req">*</span></label><select id="u-bu"></select><div class="hint">CE = AV, HA and AC combined</div></div>
+    </div>
+    <div class="warn-box ce" id="ce-prev" hidden></div>
+    <div class="row2">
+      <div class="field"><label for="u-cat">Expense category <span class="req">*</span></label><select id="u-cat"></select></div>
+      <div class="field"><label for="u-or">OR / Invoice no.</label><input id="u-or" placeholder="e.g. 0045123"></div>
+    </div>
+    <div class="field"><label for="u-vendor">Vendor (where it was bought) <span class="req">*</span></label><input id="u-vendor" placeholder="e.g. National Book Store"><div class="err" id="e-vendor"></div></div>
+    <div class="field"><label for="u-outlet">Outlet / store where it was used <span class="req">*</span></label><input id="u-outlet" list="outlet-list" placeholder="e.g. SM North EDSA"><datalist id="outlet-list"></datalist><div class="err" id="e-outlet"></div></div>
+    <div class="field">
+      <label for="u-purpose">What was the budget used for? <span class="req">*</span></label>
+      <textarea id="u-purpose" rows="3" placeholder="e.g. Shelf strips and price tags for the Puregold Cubao planogram reset"></textarea>
+      <div class="hint">Required. Include the outlet, the activity and what was bought (at least 15 characters).</div>
+      <div class="err" id="e-purpose"></div>
+    </div>
+    <div class="warn-box" id="late-warn" hidden></div>
+    <div class="warn-box bad" id="dup-warn" hidden></div>
+    <div class="err" id="e-server"></div>
+    <div class="actions"><button type="button" class="btn" id="cancel">Cancel</button><button class="btn primary" type="submit" id="u-submit">Submit receipt</button></div>
+  </form>
+</div>
+
+<!-- Budget drawer -->
+<div class="overlay" id="bud-overlay" hidden>
+  <form class="drawer" id="bud-form" novalidate>
+    <h3>Enter approved budget</h3>
+    <div class="note">Enter this only after the RMAS Head has approved the budget.</div>
+    <div class="row2">
+      <div class="field"><label for="b-month">Budget month <span class="req">*</span></label><select id="b-month"></select></div>
+      <div class="field"><label for="b-date">Date approved <span class="req">*</span></label><input type="date" id="b-date"></div>
+    </div>
+    <div class="field"><label for="b-by">Approved by <span class="req">*</span></label><input id="b-by"><div class="err" id="e-by"></div></div>
+    <div class="field">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><label>Amount per region and BU (₱)</label><button type="button" class="linkbtn" id="b-use-prop">Fill with proposed amounts (+10%)</button></div>
+      <div class="tbl-wrap"><table class="bud-tbl">
+        <thead><tr><th>Region</th><th>AV</th><th>HA</th><th>AC</th></tr></thead>
+        <tbody id="b-matrix"></tbody>
+        <tfoot><tr><td><b>Total</b></td><td class="num" id="bt-AV"></td><td class="num" id="bt-HA"></td><td class="num" id="bt-AC"></td></tr>
+        <tr><td colspan="4" class="num"><b id="bt-all"></b></td></tr></tfoot>
+      </table></div>
+      <div class="err" id="e-amts"></div>
+    </div>
+    <div class="err" id="e-bud-server"></div>
+    <div class="actions"><button type="button" class="btn" id="bud-cancel">Cancel</button><button class="btn primary" type="submit" id="b-submit">Save approved budget</button></div>
+  </form>
+</div>
+
+<div class="lb" id="lb" hidden><div class="lb-card" id="lb-card" role="dialog" aria-modal="true" aria-label="Receipt details"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+// ================= config (keep in sync with APP in Code.gs) =================
+const REGIONS=["NCR","North Luzon","Central Luzon","South Luzon","Visayas","Mindanao"];
+const BUS=["AV","HA","AC"];
+const CATS=["POS materials","Display / Rack rental","Transportation","Meals & allowance","Giveaways / Premiums","Store fixtures","Printing","Others"];
+const LATE_DAYS=7, ALLOWANCE=0.10, POLL_MS=15000;
+const CE_GIVEN={AV:0.48642,HA:0.40320,AC:0.11035};
+const CE_SUM=CE_GIVEN.AV+CE_GIVEN.HA+CE_GIVEN.AC;
+const CE_SPLIT={AV:CE_GIVEN.AV/CE_SUM,HA:CE_GIVEN.HA/CE_SUM,AC:CE_GIVEN.AC/CE_SUM};
+
+// ================= helpers =================
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONF=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const peso=n=>"₱"+n.toLocaleString("en-PH",{minimumFractionDigits:0,maximumFractionDigits:0});
+const peso2=n=>"₱"+n.toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const ymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const fmtDT=d=>d?`${MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`:"";
+const pd=s=>{if(!s)return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);};
+const pdt=s=>{if(!s)return null;const [a,b="00:00:00"]=s.split("T");const [y,m,d]=a.split("-").map(Number);const [h,mi,se]=b.split(":").map(Number);return new Date(y,m-1,d,h,mi,se||0);};
+const daysBetween=(a,b)=>Math.round((new Date(b.getFullYear(),b.getMonth(),b.getDate())-new Date(a.getFullYear(),a.getMonth(),a.getDate()))/864e5);
+function fillSelect(el,opts,allLabel){el.innerHTML=(allLabel?`<option value="">${allLabel}</option>`:"")+opts.map(o=>typeof o==="string"?`<option>${esc(o)}</option>`:`<option value="${o.v}">${esc(o.t)}</option>`).join("");}
+let tt;function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3000);}
+function shares(r){if(r.bu!=="CE")return{[r.bu]:r.amt};
+  const av=Math.round(r.amt*CE_SPLIT.AV*100)/100,ha=Math.round(r.amt*CE_SPLIT.HA*100)/100;return{AV:av,HA:ha,AC:Math.round((r.amt-av-ha)*100)/100};}
+const val=(r,bu)=>bu?(shares(r)[bu]||0):r.amt;
+const errText=e=>(e&&e.message)?e.message.replace(/^Exception: /,""):String(e);
+
+// ================= data (filled from the Google Sheet) =================
+let team=[],me=-1,myEmail="",receipts=[],approved={},auditLog=[],version="",APP_URL="";
+let TODAY=(()=>{const d=new Date();d.setHours(0,0,0,0);return d;})();
+const isHead=()=>team[me]&&team[me].role==="RMAS Head";
+function monthBudget(key,region,bu){const a=approved[key];if(!a)return null;let b=0;(region?[region]:REGIONS).forEach(r=>(bu?[bu]:BUS).forEach(u=>b+=(a.amt[r]||{})[u]||0));return b;}
+
+// ================= server bridge (same pattern as VS-REQUEST-FORM) =================
+// Paste the Apps Script Web app URL (ends in /exec) here after deploying Code.gs.
+// While it is empty the page runs in demo mode with an in-browser test server (MOCK) and nothing is saved.
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbw4Q8aNz4fMhkuFLPsn91kSGNihHNO5lLm3VkXDGBxDHPdCgNYfmGkp0-uKXsJUXyyr/exec';
+const LIVE=/^https:\/\/script\.google\.com\//.test(APPS_SCRIPT_URL);
+let ACCESS_KEY=(function(){let k='';
+  try{k=(new URLSearchParams(location.search).get('key')||'').trim();}catch(e){}
+  try{if(k)localStorage.setItem('rmas_costing_key',k);else k=localStorage.getItem('rmas_costing_key')||'';}catch(e){}
+  return k;})();
+const isKeyError=msg=>/access key/i.test(String(msg||''));
+async function apiGet(params){
+  const qs=new URLSearchParams(Object.assign({},params,{key:ACCESS_KEY,t:Date.now()}));
+  const res=await fetch(APPS_SCRIPT_URL+'?'+qs,{redirect:'follow'});
+  const data=await res.json();
+  if(!data.success)throw new Error(data.error||'Unknown server error');
+  return data;}
+async function apiPost(action,payload){
+  const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({action,key:ACCESS_KEY},payload)),redirect:'follow'});
+  const json=await res.json();
+  if(!json.success)throw new Error(json.error||'Unknown server error');
+  return json;}
+function call(fn,...args){
+  if(!LIVE)return new Promise((res,rej)=>setTimeout(()=>{try{res(MOCK[fn](...args));}catch(e){rej(e);}},150));
+  switch(fn){
+    case "getBootstrap": return apiGet({action:"bootstrap"});
+    case "getVersion":   return apiGet({action:"version"}).then(d=>d.version);
+    case "uploadReceipt":return apiPost("upload",args[0]);
+    case "saveBudget":   return apiPost("saveBudget",args[0]).then(r=>r.data);
+    case "saveTeam":     return apiPost("saveTeam",{team:args[0]}).then(r=>r.data);
+    case "newKey":       return apiPost("newKey",{index:args[0]}).then(r=>r.data);
+    case "logExport":    return apiPost("logExport",{kind:args[0],filename:args[1]});
+    case "sendTestEmail":return apiPost("sendTestEmail",{}).then(r=>r.sentTo);
+  }
+  return Promise.reject(new Error("Unknown action "+fn));}
+const SITE_URL=()=>location.href.split(/[?#]/)[0];
+const personalLink=k=>`${SITE_URL()}?key=${encodeURIComponent(k)}`;
+
+function applyData(d){
+  team=d.team;me=d.me;myEmail=(team[me]&&team[me].email)||"";version=d.version;
+  if(d.config&&d.config.today)TODAY=pd(d.config.today);
+  receipts=d.receipts.map(r=>Object.assign({},r,{date:pd(r.date),uploadedOn:pdt(r.uploadedOn)}));
+  approved={};
+  d.budgets.forEach(b=>{const [y,m]=b.month.split("-").map(Number),k=`${y}-${m-1}`;
+    if(!approved[k]){approved[k]={by:b.approvedBy,on:pd(b.dateApproved),amt:{}};REGIONS.forEach(r=>{approved[k].amt[r]={};BUS.forEach(u=>approved[k].amt[r][u]=0);});}
+    if(approved[k].amt[b.region])approved[k].amt[b.region][b.bu]=b.amount;});
+  auditLog=d.audit.map(a=>Object.assign({},a,{at:pdt(a.at)}));
+  $("me-name").textContent=team[me].name;$("me-role").textContent=isHead()?"Head · All regions":team[me].region;
+  $("u-by-name").textContent=`${team[me].name}${isHead()?"":" · "+team[me].region}`;
+  $("open-budget").disabled=!isHead();$("open-budget").title=isHead()?"":"Only the RMAS Head can enter approved budgets";
+  renderAll();setSync(true);
+}
+function setSync(ok){const p=$("sync-pill");const n=new Date();
+  p.className="status-pill "+(ok?"live":"off");
+  p.textContent=!LIVE?"Demo mode · APPS_SCRIPT_URL not set":ok?`Live · synced ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`:"Offline · retrying";}
+let busy=false;
+async function poll(){if(document.hidden||busy)return;
+  try{const v=await call("getVersion");if(v!==version){const d=await call("getBootstrap");if(!d.denied)applyData(d);}else setSync(true);}catch(_){setSync(false);}}
+setInterval(poll,POLL_MS);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll();});
+
+// ================= state + filters =================
+const state={period:"month",month:"",week:0,region:"",bu:"",q:"",group:"date",page:"dashboard"};
+let NEXT_KEY="";
+function initFilters(){
+  state.month=`${TODAY.getFullYear()}-${TODAY.getMonth()}`;
+  fillSelect($("f-month"),[0,1,2,3,4,5].map(i=>{const d=new Date(TODAY.getFullYear(),TODAY.getMonth()-i,1);return{v:`${d.getFullYear()}-${d.getMonth()}`,t:`${MONF[d.getMonth()]} ${d.getFullYear()}`};}));
+  fillSelect($("f-region"),REGIONS,"All regions");fillSelect($("f-bu"),BUS,"All BUs");
+  fillSelect($("u-region"),REGIONS);fillSelect($("u-bu"),[...BUS,{v:"CE",t:"CE (split into AV/HA/AC)"}]);fillSelect($("u-cat"),CATS);
+  const nd=new Date(TODAY.getFullYear(),TODAY.getMonth()+1,1);NEXT_KEY=`${nd.getFullYear()}-${nd.getMonth()}`;
+  fillSelect($("b-month"),[-1,0,1,2].map(i=>{const d=new Date(TODAY.getFullYear(),TODAY.getMonth()+i,1);return{v:`${d.getFullYear()}-${d.getMonth()}`,t:`${MONF[d.getMonth()]} ${d.getFullYear()}`};}));
+  fillWeeks();}
+function monthParts(){const [y,m]=state.month.split("-").map(Number);return{y,m,last:new Date(y,m+1,0).getDate()};}
+function weekRanges(){const {m,last}=monthParts();const r=[];for(let s=1;s<=last;s+=7)r.push({s,e:Math.min(s+6,last)});return r.map((w,i)=>({...w,label:`W${i+1}`,range:`${MON[m]} ${w.s}–${w.e}`}));}
+function fillWeeks(){const ws=weekRanges();fillSelect($("f-week"),ws.map((w,i)=>({v:i,t:`${w.label} · ${w.range}`})));
+  const {y,m}=monthParts();let idx=0;if(TODAY.getFullYear()===y&&TODAY.getMonth()===m)idx=Math.floor((TODAY.getDate()-1)/7);state.week=idx;$("f-week").value=idx;}
+const inMonth=r=>{const {y,m}=monthParts();return r.date.getFullYear()===y&&r.date.getMonth()===m;};
+const inPeriod=r=>{if(!inMonth(r))return false;if(state.period==="week"){const w=weekRanges()[state.week];return r.date.getDate()>=w.s&&r.date.getDate()<=w.e;}return true;};
+const scoped=r=>(!state.region||r.region===state.region)&&(!state.bu||r.bu===state.bu||r.bu==="CE");
+function budgetFor(region,bu){let b=monthBudget(state.month,region,bu);if(b===null)return null;
+  if(state.period==="week"){const {last}=monthParts();const w=weekRanges()[state.week];b=b*(w.e-w.s+1)/last;}return b;}
+const periodLabel=()=>{const {y,m}=monthParts();const w=weekRanges()[state.week];return state.period==="week"?`${w.label} · ${w.range}`:`${MONF[m]} ${y}`;};
+const scopeLabel=()=>[state.region||"All regions",state.bu||"All BUs"].join(" · ");
+function currentList(){const q=state.q.toLowerCase();
+  return receipts.filter(r=>inPeriod(r)&&scoped(r)&&(!q||[r.vendor,r.or,r.purpose,r.cat,r.outlet,r.bu,r.by].join(" ").toLowerCase().includes(q))).sort((a,b)=>b.date-a.date||b.id-a.id);}
+const flags=r=>(r.bu==="CE"?' <span class="chip ce">CE split</span>':"")+(r.late?' <span class="chip late">Late</span>':"")+(r.dup?' <span class="chip dup">Possible duplicate</span>':"");
+
+// ================= pages =================
+const TITLES={dashboard:"Dashboard",receipts:"Receipts",gallery:"Receipt gallery",budget:"Approved budget",email:"Approval email",audit:"Audit trail",team:"Team"};
+const SUBS={dashboard:"Overview of RMAS merchandising spend",receipts:"Every uploaded receipt, with what the budget was used for",gallery:"Receipt photos grouped by date, region or BU",budget:"Budgets approved by the RMAS Head, per region and BU",email:"Monthly request for next month's budget",audit:"Who did what, and when",team:"The RMAS Head and the six regional RMAS users"};
+const FILTER_PAGES=["dashboard","receipts","gallery"];
+function showPage(p){if(!TITLES[p])p="dashboard";state.page=p;
+  document.querySelectorAll("[data-view]").forEach(s=>s.hidden=s.dataset.view!==p);
+  document.querySelectorAll(".nav a,.tabs a").forEach(a=>{if((a.dataset.page||a.dataset.tab)===p)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});
+  $("page-title").textContent=TITLES[p];$("page-sub").textContent=SUBS[p];$("filters").hidden=!FILTER_PAGES.includes(p);renderAll();}
+document.addEventListener("click",e=>{const a=e.target.closest('a[href^="#"]');if(!a)return;const p=a.getAttribute("href").slice(1);if(!TITLES[p])return;
+  e.preventDefault();showPage(p);window.scrollTo(0,0);});
+
+function renderAll(){if(me<0)return;renderDashboard();renderReceipts();renderGallery();renderBudget();renderEmail();renderAudit();if(state.page==="team")renderTeam();
+  const n=$("n-receipts");n.textContent=receipts.length;n.toggleAttribute("data-zero",!receipts.length);}
+
+function renderDashboard(){
+  const per=receipts.filter(r=>inPeriod(r)&&scoped(r));
+  const spent=per.reduce((a,r)=>a+val(r,state.bu),0),budget=budgetFor(state.region,state.bu),hasB=budget!==null,pct=budget?spent/budget:0;
+  const {m}=monthParts(),cls=pct>1?"bad":pct>.85?"warn":"";
+  const I={peso:'<path d="M7 20V4h6a4 4 0 0 1 0 8H7M4 8h14M4 11h14"/>',wallet:'<path d="M3 7h18v12H3z"/><path d="M16 13h2"/><path d="M3 7l2-3h12l2 3"/>',gauge:'<path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 14 4-4"/>',doc:'<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h3"/>'};
+  const ico=(c,k)=>`<span class="ico ${c}"><svg viewBox="0 0 24 24">${I[k]}</svg></span>`;
+  const late=per.filter(r=>r.late).length;
+  $("tiles").innerHTML=`
+   <div class="tile">${ico("blue","peso")}<div class="t-lbl">Total spent</div><div class="val">${peso(spent)}</div><div class="sub m">${periodLabel()} · ${scopeLabel()}</div>${hasB?`<div class="meter"><i class="${cls}" style="width:${Math.min(pct*100,100)}%"></i></div>`:""}</div>
+   <div class="tile">${ico("green","wallet")}<div class="t-lbl">Approved ${state.period==="week"?"weekly":"monthly"} budget</div>${hasB?`<div class="val">${peso(budget)}</div><div class="sub g">Approved by ${esc(approved[state.month].by)}${state.period==="week"?" · prorated":""}</div>`:`<div class="val no-bud">No approved budget yet</div><div class="sub"><a class="linkbtn" href="#budget" style="font-size:13px">See approved budgets</a></div>`}</div>
+   <div class="tile">${ico(hasB&&budget-spent<0?"red":"amber","gauge")}<div class="t-lbl">Remaining</div>${hasB?`<div class="val" style="color:${budget-spent<0?"var(--bad)":"inherit"}">${peso(budget-spent)}</div><div class="sub ${pct>.85?"r":"g"}">${Math.round(pct*100)}% of budget used</div>`:`<div class="val">—</div><div class="sub m">Shown once a budget is approved</div>`}</div>
+   <div class="tile">${ico(late?"red":"blue","doc")}<div class="t-lbl">Receipts</div><div class="val">${per.length.toLocaleString()}</div><div class="sub ${late?"r":"m"}">${late} late · ${per.filter(r=>r.bu==="CE").length} CE split</div></div>`;
+  const niceMax=v=>{if(v<=0)return 10000;const p=Math.pow(10,Math.floor(Math.log10(v)));const f=v/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;};
+  const fmtK=v=>v>=1000?(v/1000).toLocaleString("en-PH",{maximumFractionDigits:1})+"k":String(v);
+  const bars=(keys,sumFn,budFn)=>{const rows=keys.map(k=>({k,s:sumFn(k),b:budFn(k)}));const max=niceMax(Math.max(...rows.map(r=>Math.max(r.s,r.b||0))));const ticks=[0,.25,.5,.75,1];
+    return `<div class="hchart"><div>${rows.map(r=>`<div class="lab">${esc(r.k)}</div>`).join("")}</div>
+      <div class="plot"><div class="grid">${ticks.slice(1).map(t=>`<div style="left:${t*100}%"></div>`).join("")}</div>
+      ${rows.map(r=>{const hb=r.b!==null;return `<div class="row" title="${esc(r.k)}: ${peso(r.s)}${hb?" of "+peso(r.b):""}"><i class="${hb&&r.s>r.b?"over":""}" style="width:${r.s/max*100}%"></i><span>${r.s?peso(r.s):""}</span>${hb?`<b style="left:${Math.min(r.b/max*100,99.5)}%"></b>`:""}</div>`;}).join("")}</div>
+      <div class="axis">${ticks.map(t=>`<span style="left:${t*100}%">${t===0?"0":"₱"+fmtK(t*max)}</span>`).join("")}</div></div>`;};
+  $("by-region").innerHTML=bars(state.region?[state.region]:REGIONS,k=>per.filter(r=>r.region===k).reduce((a,r)=>a+val(r,state.bu),0),k=>budgetFor(k,state.bu));
+  $("by-bu").innerHTML=bars(state.bu?[state.bu]:BUS,k=>per.reduce((a,r)=>a+val(r,k),0),k=>budgetFor(state.region,k));
+  $("reg-cap").textContent=periodLabel();$("bu-cap").textContent=periodLabel();
+  const ws=weekRanges(),wv=ws.map(w=>receipts.filter(r=>inMonth(r)&&scoped(r)&&r.date.getDate()>=w.s&&r.date.getDate()<=w.e).reduce((a,r)=>a+val(r,state.bu),0)),wmax=Math.max(...wv,1);
+  $("weeks").innerHTML=ws.map((w,i)=>`<div class="wk"><span class="n">${peso(wv[i]/1000)}k</span><div class="col ${state.period==="week"&&i===state.week?"now":""}" style="height:${wv[i]/wmax*100}px"></div><span class="d">${w.label}<br>${w.range}</span></div>`).join("");
+  $("wk-cap").textContent=`${MONF[m]} · ${scopeLabel()}`;
+  const rec=[...receipts].sort((a,b)=>b.uploadedOn-a.uploadedOn).slice(0,6);
+  $("recent").innerHTML=rec.length?rec.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td style="white-space:nowrap">${MON[r.date.getMonth()]} ${r.date.getDate()}</td><td>${esc(r.vendor)}<div class="sub-t">${esc(r.region)} · ${esc(r.bu)} · ${esc(r.by)}</div></td><td class="num">${peso2(r.amt)}</td></tr>`).join("")
+    :`<tr><td><div class="empty"><b>No receipts yet</b>Use “Upload receipt” to add the first one.</div></td></tr>`;}
+
+function renderReceipts(){const list=currentList();
+  $("rc-cap").textContent=`${list.length} in ${periodLabel()}`;
+  $("rows").innerHTML=list.length?list.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0">
+    <td style="white-space:nowrap">${MON[r.date.getMonth()]} ${r.date.getDate()}</td>
+    <td><div>${esc(r.vendor)} <span class="tag">OR ${esc(r.or||"—")}</span>${flags(r)}</div><div class="purpose">${esc(r.outlet)} · ${esc(r.purpose)}</div></td>
+    <td style="white-space:nowrap">${esc(r.region)}<br><span class="sub-t">${r.bu==="CE"?"CE → AV/HA/AC":esc(r.bu)}</span></td>
+    <td>${esc(r.cat)}</td><td style="white-space:nowrap">${esc(r.by)}</td>
+    <td class="num">${peso2(r.amt)}${r.bu==="CE"&&state.bu?`<br><span class="sub-t">${state.bu} share ${peso2(val(r,state.bu))}</span>`:""}</td></tr>`).join("")
+    :`<tr><td colspan="6"><div class="empty"><b>No receipts for this filter</b>Upload a receipt or change the filters above.</div></td></tr>`;}
+["rows","recent","audit-rows"].forEach(id=>{$(id).addEventListener("click",e=>{const tr=e.target.closest("tr[data-id]");if(tr)openReceipt(+tr.dataset.id);});
+  $(id).addEventListener("keydown",e=>{if(e.key==="Enter"){const tr=e.target.closest("tr[data-id]");if(tr)openReceipt(+tr.dataset.id);}});});
+
+const isPdf=r=>r.fileType==="application/pdf";
+const thumbPic=r=>isPdf(r)?`<span class="pdf">PDF</span>`:(LIVE&&r.fileId?`<img loading="lazy" alt="Receipt from ${esc(r.vendor)}" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(r.fileId)}&sz=w400" onerror="this.outerHTML='<span class=&quot;ph&quot;>Photo</span>'">`:(r.preview?`<img alt="Receipt from ${esc(r.vendor)}" src="${r.preview}">`:`<span class="ph">Photo</span>`));
+function renderGallery(){const list=currentList();let groups;
+  if(state.group==="date"){const map=new Map();list.forEach(r=>{const k=ymd(r.date);if(!map.has(k))map.set(k,{title:`${MONF[r.date.getMonth()]} ${r.date.getDate()}, ${r.date.getFullYear()}`,items:[]});map.get(k).items.push(r);});groups=[...map.values()];}
+  else{const keys=state.group==="region"?REGIONS:[...BUS,"CE"];groups=keys.map(k=>({title:state.group==="bu"?`BU: ${k}`:k,items:list.filter(r=>(state.group==="region"?r.region:r.bu)===k)})).filter(g=>g.items.length);}
+  $("gal-cap").textContent=`${list.length} receipts · ${periodLabel()}`;
+  if(state.page!=="gallery")return; // thumbnails load only when the gallery is open
+  $("gallery").innerHTML=groups.length?groups.map(g=>`<div><div class="gal-head"><h3>${esc(g.title)}</h3><span>${g.items.length} receipt${g.items.length===1?"":"s"} · ${peso2(g.items.reduce((a,r)=>a+r.amt,0))}</span></div>
+    <div class="gal">${g.items.map(r=>`<button class="thumb" data-id="${r.id}" aria-label="Open receipt ${esc(r.vendor)} ${peso2(r.amt)}"><div class="pic">${thumbPic(r)}</div>
+      <div class="meta"><b>${peso2(r.amt)}${r.bu==="CE"?' <span class="chip ce" style="font-size:10px;padding:0 6px">CE</span>':""}</b><span>${esc(r.outlet)}</span><span>${state.group==="date"?esc(r.region)+" · "+esc(r.bu):MON[r.date.getMonth()]+" "+r.date.getDate()+" · "+esc(state.group==="region"?r.bu:r.region)}</span><span>${esc(r.vendor)}</span></div></button>`).join("")}</div></div>`).join("")
+    :`<div class="empty"><b>No receipts here yet</b>Uploaded receipts appear here, grouped by date, region or BU.</div>`;}
+$("gallery").addEventListener("click",e=>{const b=e.target.closest(".thumb");if(b)openReceipt(+b.dataset.id);});
+const setGroup=g=>{state.group=g;["date","region","bu"].forEach(k=>$("g-"+k).setAttribute("aria-pressed",k===g));renderGallery();};
+$("g-date").onclick=()=>setGroup("date");$("g-region").onclick=()=>setGroup("region");$("g-bu").onclick=()=>setGroup("bu");
+
+function splitTable(amt){const s=shares({bu:"CE",amt});return `<table class="split"><tbody>${BUS.map(b=>`<tr><td>${b}</td><td class="num">${(CE_SPLIT[b]*100).toFixed(3)}%</td><td class="num">${peso2(s[b])}</td></tr>`).join("")}</tbody></table>`;}
+function openReceipt(id){const r=receipts.find(x=>x.id===id);if(!r)return;
+  const log=auditLog.filter(l=>l.rid===r.id).sort((a,b)=>a.at-b.at);
+  $("lb-card").innerHTML=`<div class="big" id="lb-pic"><div class="spin" aria-label="Loading receipt"></div></div><div class="info"><h3>${esc(r.vendor)}</h3>
+    <div>${flags(r)}</div>
+    <dl class="kv"><dt>Receipt date</dt><dd>${MONF[r.date.getMonth()]} ${r.date.getDate()}, ${r.date.getFullYear()}</dd>
+    <dt>Uploaded</dt><dd>${fmtDT(r.uploadedOn)}${r.late?` <span class="sub-t">(${daysBetween(r.date,r.uploadedOn)} days after)</span>`:""}</dd>
+    <dt>Uploaded by</dt><dd>${esc(r.by)}</dd><dt>Amount</dt><dd>${peso2(r.amt)}</dd>
+    <dt>Outlet</dt><dd>${esc(r.outlet)}</dd><dt>Region</dt><dd>${esc(r.region)}</dd><dt>BU</dt><dd>${esc(r.bu)}</dd><dt>Category</dt><dd>${esc(r.cat)}</dd><dt>OR no.</dt><dd>${esc(r.or||"—")}</dd></dl>
+    <div><div class="lbl" style="margin-bottom:2px">What it was used for</div><div>${esc(r.purpose)}</div></div>
+    ${r.bu==="CE"?`<div><div class="lbl" style="margin-bottom:2px">CE split</div>${splitTable(r.amt)}</div>`:""}
+    <div><div class="lbl" style="margin-bottom:4px">History</div><ol class="hist">${log.map(l=>`<li><b>${esc(l.action)}</b> · ${esc(l.who)}<br><span>${fmtDT(l.at)}${l.detail?" · "+esc(l.detail):""}</span></li>`).join("")}</ol></div>
+    <div class="actions">${r.fileUrl?`<a class="btn" href="${esc(r.fileUrl)}" target="_blank" rel="noopener">Open in Google Drive</a>`:""}<button class="btn" id="lb-close">Close</button></div></div>`;
+  $("lb").hidden=false;$("lb-close").focus();$("lb-close").onclick=()=>$("lb").hidden=true;
+  const box=$("lb-pic");
+  if(isPdf(r)){box.innerHTML=`<span class="pdf">PDF</span>`;return;}
+  if(!LIVE){const f=MOCK.getFileData(r.fileId);box.innerHTML=f?`<img alt="Receipt from ${esc(r.vendor)}" src="data:${f.type};base64,${f.data}">`:`<span class="ph">No photo</span>`;return;}
+  box.innerHTML=`<img alt="Receipt from ${esc(r.vendor)}" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(r.fileId)}&sz=w1600" onerror="this.outerHTML='<span class=&quot;ph&quot;>Couldn\\'t load the photo. Use “Open in Google Drive”.</span>'">`;}
+$("lb").onclick=e=>{if(e.target.id==="lb")$("lb").hidden=true;};
+
+// ================= next-month proposal =================
+function proposal(){
+  const y=TODAY.getFullYear(),m=TODAY.getMonth(),dim=new Date(y,m+1,0).getDate(),el=TODAY.getDate();
+  const spent=(rg,bu)=>receipts.filter(r=>r.date.getFullYear()===y&&r.date.getMonth()===m&&r.region===rg).reduce((a,r)=>a+val(r,bu),0);
+  const cell={},cs={};
+  REGIONS.forEach(rg=>{cell[rg]={};cs[rg]={};BUS.forEach(bu=>{const s=spent(rg,bu);cs[rg][bu]=s;cell[rg][bu]=s>0?Math.ceil(s/el*dim*(1+ALLOWANCE)/1000)*1000:0;});});
+  const sum=(f,o)=>REGIONS.reduce((a,rg)=>a+BUS.reduce((b,bu)=>b+(f(rg,bu)?o[rg][bu]:0),0),0);
+  return{cell,dim,el,
+    regs:REGIONS.map(rg=>({k:rg,s:sum(r=>r===rg,cs),proj:sum(r=>r===rg,cs)/el*dim,prop:sum(r=>r===rg,cell)})),
+    bus:BUS.map(bu=>({k:bu,s:sum((r,b)=>b===bu,cs),proj:sum((r,b)=>b===bu,cs)/el*dim,prop:sum((r,b)=>b===bu,cell)}))};}
+
+function renderEmail(){
+  const y=TODAY.getFullYear(),m=TODAY.getMonth(),last=new Date(y,m+1,0),send=new Date(y,m,last.getDate()-7,8,0);
+  const days=daysBetween(TODAY,send),nm=new Date(y,m+1,1),nextKey=`${nm.getFullYear()}-${nm.getMonth()}`;
+  const P=proposal(),T=(rows,k)=>rows.reduce((a,r)=>a+r[k],0),H=team[0],cc=team.slice(1);
+  const tbl=(label,rows)=>`<div class="tbl-wrap"><table>
+      <thead><tr><th>${label}</th><th class="num">Spent MTD</th><th class="num">Projected ${MON[m]}</th><th class="num">Needed ${MON[nm.getMonth()]} (+10%)</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td>${r.k}</td><td class="num">${peso(r.s)}</td><td class="num">${peso(r.proj)}</td><td class="num"><b>${peso(r.prop)}</b></td></tr>`).join("")}
+      <tr><td><b>Total</b></td><td class="num"><b>${peso(T(rows,"s"))}</b></td><td class="num"><b>${peso(T(rows,"proj"))}</b></td><td class="num"><b>${peso(T(rows,"prop"))}</b></td></tr></tbody></table></div>`;
+  $("sched").innerHTML=`
+    <div><div class="lbl">Sends in</div><div class="count">${days<0?"Sent":days===0?"Today":`${days} day${days===1?"":"s"}`}</div></div>
+    <dl class="kv">
+      <dt>Send date</dt><dd>${MON[send.getMonth()]} ${send.getDate()}, ${send.getFullYear()} · 8:00 AM</dd>
+      <dt>Rule</dt><dd>Last day of the month (${MON[m]} ${last.getDate()}) minus 7 days</dd>
+      <dt>Budget for</dt><dd>${MONF[nm.getMonth()]} ${nm.getFullYear()}</dd>
+      <dt>Amount requested</dt><dd>Projected ${MON[m]} spend + 10% per BU</dd>
+      <dt>To</dt><dd>${esc(H.name)} (RMAS Head)${H.email?`<br><span class="sub-t">${esc(H.email)}</span>`:""}</dd>
+      <dt>Cc</dt><dd>${cc.map(t=>esc(t.name)).join(", ")}</dd>
+      <dt>Reminder</dt><dd>2 days later if the budget is still not entered</dd>
+      <dt>Status</dt><dd>${approved[nextKey]?`<span class="chip ok">Approved ${MON[approved[nextKey].on.getMonth()]} ${approved[nextKey].on.getDate()}</span>`:`<span class="chip wait">Waiting for approval</span>`}</dd>
+    </dl>
+    ${isHead()?`<button class="btn" id="send-test">Send a test email to me</button>`:""}
+    <div class="note">Sent automatically by Google at 8:00 AM on the send date, with this month's receipt list attached as Excel.</div>`;
+  $("mail").innerHTML=`
+    <div class="hdr"><div><b>To:</b> ${esc(H.name)}${H.email?` &lt;${esc(H.email)}&gt;`:""}</div><div><b>Cc:</b> ${cc.map(t=>esc(t.name)).join(", ")}</div>
+      <div><b>Subject:</b> [RMAS] Budget approval request: ${MONF[nm.getMonth()]} ${nm.getFullYear()} merchandising</div></div>
+    <p>Hi ${esc(H.name)},</p>
+    <p>Here is the merchandising spend for ${MONF[m]} as of ${MON[m]} ${TODAY.getDate()} and the budget needed for ${MONF[nm.getMonth()]}. The request is this month's projected spend plus a 10% allowance per BU for unexpected expenses. Please approve or send back with comments before ${MON[m]} ${last.getDate()}.</p>
+    <p><b>Budget needed per BU</b></p>${tbl("BU",P.bus)}
+    <p><b>Breakdown per region</b></p>${tbl("Region",P.regs)}
+    <p class="note">Projected = spend as of ${MON[m]} ${P.el} ÷ ${P.el} days × ${P.dim} days. AV, HA and AC include their share of CE expenses (AV ${(CE_SPLIT.AV*100).toFixed(3)}%, HA ${(CE_SPLIT.HA*100).toFixed(3)}%, AC ${(CE_SPLIT.AC*100).toFixed(3)}%). Amounts are rounded up to the nearest ₱1,000.</p>
+    <div class="cta"><span class="ok">Open RMAS Costing</span></div>`;
+  const st=$("send-test");if(st)st.onclick=async()=>{st.disabled=true;st.textContent="Sending…";
+    try{const to=await call("sendTestEmail");toast(`Test email sent to ${to}`);}catch(e){toast(errText(e));}st.disabled=false;st.textContent="Send a test email to me";};}
+
+// ================= approved budget =================
+$("b-matrix").innerHTML=REGIONS.map((r,i)=>`<tr><td style="white-space:nowrap">${r}</td>${BUS.map(b=>`<td><input type="number" min="0" step="1000" inputmode="numeric" id="b-${i}-${b}" data-r="${r}" data-b="${b}" aria-label="${r} ${b}" placeholder="0"></td>`).join("")}</tr>`).join("");
+function budTotals(){let all=0;BUS.forEach(b=>{let t=0;document.querySelectorAll(`#b-matrix input[data-b="${b}"]`).forEach(i=>t+=+i.value||0);$("bt-"+b).textContent=peso(t);all+=t;});$("bt-all").textContent="Grand total "+peso(all);return all;}
+function loadBud(key){const a=approved[key];
+  document.querySelectorAll("#b-matrix input").forEach(i=>i.value=a?a.amt[i.dataset.r][i.dataset.b]:"");
+  $("b-by").value=a?a.by:team[0].name;$("b-date").value=ymd(a?a.on:TODAY);["e-by","e-amts","e-bud-server"].forEach(id=>$(id).textContent="");budTotals();}
+function openBud(key){if(!isHead()){toast("Only the RMAS Head can enter approved budgets");return;}
+  $("b-month").value=key||NEXT_KEY;if(!$("b-month").value)$("b-month").value=NEXT_KEY;loadBud($("b-month").value);$("bud-overlay").hidden=false;$("b-by").focus();}
+const closeBud=()=>$("bud-overlay").hidden=true;
+$("open-budget").onclick=()=>openBud(NEXT_KEY);
+$("bud-cancel").onclick=closeBud;
+$("bud-overlay").onclick=e=>{if(e.target.id==="bud-overlay")closeBud();};
+$("b-month").onchange=e=>loadBud(e.target.value);
+$("b-matrix").addEventListener("input",budTotals);
+$("b-use-prop").onclick=()=>{const P=proposal();document.querySelectorAll("#b-matrix input").forEach(i=>i.value=P.cell[i.dataset.r][i.dataset.b]||"");budTotals();toast("Filled with proposed amounts (+10%). Edit any amount the RMAS Head changed.");};
+$("bud-form").addEventListener("submit",async e=>{e.preventDefault();
+  const by=$("b-by").value.trim();$("e-by").textContent=by?"":"Enter who approved the budget.";
+  const all=budTotals();$("e-amts").textContent=all>0?"":"Enter at least one approved amount.";
+  if(!by||!(all>0))return;
+  const amounts={};REGIONS.forEach(r=>{amounts[r]={};BUS.forEach(b=>amounts[r][b]=0);});
+  document.querySelectorAll("#b-matrix input").forEach(i=>amounts[i.dataset.r][i.dataset.b]=+i.value||0);
+  const key=$("b-month").value,[ky,km]=key.split("-").map(Number);
+  const btn=$("b-submit");btn.disabled=true;btn.textContent="Saving…";busy=true;
+  try{const d=await call("saveBudget",{month:`${ky}-${String(km+1).padStart(2,"0")}`,approvedBy:by,dateApproved:$("b-date").value,amounts});
+    applyData(d);closeBud();toast(`Approved budget saved for ${MONF[km]} ${ky}`);}
+  catch(err){$("e-bud-server").textContent=errText(err);}
+  finally{btn.disabled=false;btn.textContent="Save approved budget";busy=false;}});
+function renderBudget(){const keys=Object.keys(approved).sort((a,b)=>{const [ay,am]=a.split("-").map(Number),[by,bm]=b.split("-").map(Number);return by-ay||bm-am;});
+  $("bud-rows").innerHTML=keys.length?keys.map(k=>{const a=approved[k],[y,m]=k.split("-").map(Number);
+    return `<tr><td>${MONF[m]} ${y}</td><td>${esc(a.by)}</td><td>${a.on?`${MON[a.on.getMonth()]} ${a.on.getDate()}, ${a.on.getFullYear()}`:""}</td>${BUS.map(b=>`<td class="num">${peso(monthBudget(k,"",b))}</td>`).join("")}<td class="num"><b>${peso(monthBudget(k,"",""))}</b></td><td>${isHead()?`<button class="linkbtn" data-edit="${k}">Edit</button>`:""}</td></tr>`;}).join("")
+    :`<tr><td colspan="8"><div class="empty"><b>No approved budget yet</b>Once the RMAS Head approves next month's budget, it is entered here.</div></td></tr>`;}
+$("bud-rows").addEventListener("click",e=>{const b=e.target.closest("[data-edit]");if(b)openBud(b.dataset.edit);});
+
+// ================= audit =================
+function renderAudit(){const q=$("audit-q").value.toLowerCase(),a=$("audit-act").value;
+  const list=auditLog.filter(l=>(!a||l.action===a)&&(!q||(l.who+" "+l.action+" "+l.detail).toLowerCase().includes(q))).sort((x,y)=>y.at-x.at);
+  $("audit-cap").textContent=`${list.length} events`;
+  $("audit-rows").innerHTML=list.map(l=>`<tr${l.rid?` class="click" data-id="${l.rid}"`:""}><td style="white-space:nowrap">${fmtDT(l.at)}</td><td style="white-space:nowrap">${esc(l.who)}</td><td style="white-space:nowrap">${esc(l.action)}</td><td><span class="purpose">${esc(l.detail||"")}</span></td></tr>`).join("")||`<tr><td colspan="4"><div class="empty"><b>No activity yet</b>Uploads, budget entries, exports and team changes are recorded here.</div></td></tr>`;}
+$("audit-q").oninput=renderAudit;$("audit-act").onchange=renderAudit;
+
+// ================= team =================
+function renderTeam(){const ro=!isHead();
+  $("team-rows").innerHTML=team.map((t,i)=>`<tr><td>${i+1}</td><td><input id="t-name-${i}" value="${esc(t.name)}" aria-label="Name ${i+1}"${ro?" disabled":""}></td>
+    <td>${t.role==="RMAS Head"?'<span class="chip ok">RMAS Head</span>':'<span class="chip ce">RMAS Team</span>'}</td>
+    <td>${t.role==="RMAS Head"?'<span class="sub-t">All regions</span>':`<select id="t-reg-${i}" aria-label="Region ${i+1}"${ro?" disabled":""}>${REGIONS.map(r=>`<option${r===t.region?" selected":""}>${r}</option>`).join("")}</select>`}</td>
+    <td><input id="t-mail-${i}" type="email" value="${esc(t.email)}" placeholder="name@gmail.com" aria-label="Email ${i+1}"${ro?" disabled":""}></td>
+    <td style="white-space:nowrap">${t.key?`<button type="button" class="btn" data-copy="${i}">Copy link</button>${ro?"":` <button type="button" class="linkbtn" data-newkey="${i}">New key</button>`}`:'<span class="sub-t">—</span>'}</td></tr>`).join("");
+  const btn=$("team-form").querySelector("button[type=submit]");btn.disabled=ro;btn.title=ro?"Only the RMAS Head can change the team":"";}
+$("team-form").addEventListener("submit",async e=>{e.preventDefault();if(!isHead())return;
+  const list=team.map((t,i)=>({name:$(`t-name-${i}`).value.trim(),region:$(`t-reg-${i}`)?$(`t-reg-${i}`).value:"",email:$(`t-mail-${i}`).value.trim()}));
+  if(!list[0].email){toast("The RMAS Head needs an email address");return;}
+  const btn=$("team-form").querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Saving…";busy=true;
+  try{const d=await call("saveTeam",list);applyData(d);toast("Team saved");}
+  catch(err){toast(errText(err));}
+  finally{btn.disabled=false;btn.textContent="Save team";busy=false;}});
+
+// personal links: copy, or replace a key (the old link stops working)
+$("team-rows").addEventListener("click",async e=>{
+  const c=e.target.closest("[data-copy]");
+  if(c){const t=team[+c.dataset.copy],link=personalLink(t.key);
+    try{await navigator.clipboard.writeText(link);toast(`Link for ${t.name} copied`);}
+    catch(_){window.prompt?.("Copy this link:",link);}return;}
+  const n=e.target.closest("[data-newkey]");
+  if(n){const i=+n.dataset.newkey;if(!confirm(`Make a new access key for ${team[i].name}? Their current link will stop working.`))return;
+    busy=true;try{const d=await call("newKey",i);if(i===me){ACCESS_KEY=d.team[i].key;try{localStorage.setItem('rmas_costing_key',ACCESS_KEY);}catch(_){}}
+      applyData(d);toast(`New link ready for ${team[i].name}. Copy it and send it to them.`);}catch(err){toast(errText(err));}busy=false;}});
+
+// ================= filters =================
+const setPeriod=v=>{state.period=v;$("v-week").setAttribute("aria-pressed",v==="week");$("v-month").setAttribute("aria-pressed",v==="month");$("f-week").hidden=v!=="week";renderAll();};
+$("v-week").onclick=()=>setPeriod("week");$("v-month").onclick=()=>setPeriod("month");
+$("f-month").onchange=e=>{state.month=e.target.value;fillWeeks();renderAll();};
+$("f-week").onchange=e=>{state.week=+e.target.value;renderAll();};
+$("f-region").onchange=e=>{state.region=e.target.value;renderAll();};
+$("f-bu").onchange=e=>{state.bu=e.target.value;renderAll();};
+$("search").oninput=e=>{state.q=e.target.value;renderReceipts();};
+
+// ================= upload =================
+let file=null,filePayload=null,dupOk=false;
+const fillOutlets=()=>{const rg=$("u-region").value;$("outlet-list").innerHTML=[...new Set(receipts.filter(r=>r.region===rg).map(r=>r.outlet))].sort().map(o=>`<option value="${esc(o)}">`).join("");};
+function cePreview(){const show=$("u-bu").value==="CE",box=$("ce-prev");box.hidden=!show;if(!show)return;
+  const a=parseFloat($("u-amt").value)||0;box.innerHTML=`<b>CE split</b> of ${peso2(a)}${splitTable(a)}`;}
+function lateCheck(){const dv=$("u-date").value,w=$("late-warn");if(!dv){w.hidden=true;return 0;}
+  const n=daysBetween(pd(dv),TODAY);
+  if(n>LATE_DAYS){w.hidden=false;w.innerHTML=`<b>Late submission.</b> This receipt is ${n} days old (limit: ${LATE_DAYS} days). You can still submit it, but it will be tagged Late.`;}else w.hidden=true;return n;}
+function applyUploaderRegion(){const t=team[me],sel=$("u-region");
+  if(t&&t.region){sel.value=t.region;sel.disabled=true;$("u-reg-hint").textContent="Your region";}else{sel.disabled=false;$("u-reg-hint").textContent="";}fillOutlets();}
+const openU=()=>{$("overlay").hidden=false;$("u-date").value=ymd(TODAY);if(state.region)$("u-region").value=state.region;if(state.bu)$("u-bu").value=state.bu;applyUploaderRegion();cePreview();lateCheck();$("u-amt").focus();};
+const closeU=()=>{$("overlay").hidden=true;$("upload-form").reset();file=null;filePayload=null;dupOk=false;["ce-prev","dup-warn","late-warn"].forEach(id=>$(id).hidden=true);$("u-submit").textContent="Submit receipt";$("drop").classList.remove("has");$("drop-txt").innerHTML='Click to choose a file or drag it here<br><small>JPG, PNG or PDF, up to 10 MB</small>';["file","date","amt","vendor","outlet","purpose","server"].forEach(k=>$("e-"+k).textContent="");};
+$("open-upload").onclick=openU;$("cancel").onclick=closeU;
+$("overlay").onclick=e=>{if(e.target.id==="overlay")closeU();};
+// photos are resized to max 1600 px (JPEG) before upload to keep them small; PDFs are sent as-is
+function takeFile(f){if(!f)return;if(f.size>10*1024*1024){$("e-file").textContent="This file is over 10 MB. Compress the photo or upload a smaller PDF.";return;}
+  file=f;filePayload=null;$("e-file").textContent="";$("drop").classList.add("has");$("drop-txt").textContent=`Preparing ${f.name}…`;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    if(f.type==="application/pdf"){filePayload={type:f.type,data:String(rd.result).split(",")[1],preview:null};$("drop-txt").textContent=f.name;return;}
+    const img=new Image();img.onload=()=>{const k=Math.min(1,1600/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);const url=c.toDataURL("image/jpeg",0.82);
+      filePayload={type:"image/jpeg",data:url.split(",")[1],preview:url};$("drop-txt").innerHTML=`${esc(f.name)}<img alt="Receipt preview" src="${url}">`;};
+    img.onerror=()=>{$("e-file").textContent="This image can't be read. Try a JPG or PNG.";file=null;};img.src=rd.result;};
+  rd.readAsDataURL(f);}
+$("u-file").onchange=e=>takeFile(e.target.files[0]);
+$("cam-btn").onclick=()=>$("u-cam").click();$("u-cam").onchange=e=>takeFile(e.target.files[0]);
+["dragover","dragenter"].forEach(t=>$("drop").addEventListener(t,e=>e.preventDefault()));
+$("drop").addEventListener("drop",e=>{e.preventDefault();takeFile(e.dataTransfer.files[0]);});
+$("u-region").addEventListener("change",fillOutlets);
+$("u-bu").addEventListener("change",cePreview);$("u-amt").addEventListener("input",cePreview);
+$("u-date").addEventListener("input",lateCheck);
+["u-or","u-vendor"].forEach(id=>$(id).addEventListener("input",()=>{dupOk=false;$("dup-warn").hidden=true;$("u-submit").textContent="Submit receipt";}));
+$("upload-form").addEventListener("submit",async e=>{
+  e.preventDefault();let ok=true;const set=(k,msg)=>{$("e-"+k).textContent=msg;if(msg)ok=false;};
+  set("server","");
+  set("file",file?(filePayload?"":"The file is still being prepared. Try again in a moment."):"Attach the receipt photo or PDF.");
+  const dv=$("u-date").value;set("date",dv?"":"Pick the date on the receipt.");
+  if(dv&&lateCheck()<0)set("date","The receipt date can't be in the future.");
+  const amt=parseFloat($("u-amt").value);set("amt",amt>0?"":"Enter the amount on the receipt.");
+  set("vendor",$("u-vendor").value.trim()?"":"Enter where it was bought.");
+  set("outlet",$("u-outlet").value.trim()?"":"Enter the outlet or store where it was used.");
+  const p=$("u-purpose").value.trim();set("purpose",p.length>=15?"":"Describe what the budget was used for (at least 15 characters).");
+  if(!ok)return;
+  const btn=$("u-submit");btn.disabled=true;const label=btn.textContent;btn.textContent="Uploading…";busy=true;
+  try{
+    const res=await call("uploadReceipt",{date:dv,amt,region:$("u-region").value,bu:$("u-bu").value,cat:$("u-cat").value,vendor:$("u-vendor").value.trim(),outlet:$("u-outlet").value.trim(),or:$("u-or").value.trim(),purpose:p,file:{type:filePayload.type,data:filePayload.data},confirmDup:dupOk});
+    if(res.dup){const d=res.dup,w=$("dup-warn");w.hidden=false;
+      w.innerHTML=`<b>Possible duplicate.</b> A receipt with the same OR no. and vendor is already uploaded: ${esc(d.vendor)} · OR ${esc(d.or)} · ${peso2(+d.amt)} · ${esc(d.date)} · uploaded by ${esc(d.by)}. Check it first. If this is a different receipt, click “Submit anyway”.`;
+      dupOk=true;btn.textContent="Submit anyway";w.scrollIntoView({block:"nearest"});return;}
+    applyData(res.data);const late=lateCheck()>LATE_DAYS,wasDup=dupOk;closeU();
+    toast(wasDup?"Uploaded and flagged as a possible duplicate":late?"Uploaded and tagged Late":"Receipt uploaded");
+  }catch(err){$("e-server").textContent=errText(err);btn.textContent=label;}
+  finally{btn.disabled=false;busy=false;if(btn.textContent==="Uploading…")btn.textContent=dupOk?"Submit anyway":"Submit receipt";}});
+
+// ================= export (Excel / PDF) =================
+function reportInfo(){const {y,m}=monthParts(),w=weekRanges()[state.week],list=currentList();
+  const fname=`RMAS-Costing_${state.period==="week"?`${y}-${MON[m]}-${w.label}`:`${y}-${MON[m]}`}${state.region?"_"+state.region.replace(/\s/g,""):""}${state.bu?"_"+state.bu:""}`;
+  const regs=(state.region?[state.region]:REGIONS).map(k=>({k,s:list.filter(r=>r.region===k).reduce((a,r)=>a+val(r,state.bu),0),b:budgetFor(k,state.bu)}));
+  const bus=(state.bu?[state.bu]:BUS).map(k=>({k,s:list.reduce((a,r)=>a+val(r,k),0),b:budgetFor(state.region,k)}));
+  return{period:periodLabel(),scope:scopeLabel(),list,fname,regs,bus};}
+function download(filename,data,mime,kind){
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:mime}));a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);
+  call("logExport",kind,filename).then(()=>poll()).catch(()=>{});toast(`${kind} downloaded`);}
+$("exp-xlsx").onclick=()=>{if(!window.XLSX){toast("The Excel library is still loading. Try again.");return;}
+  const R=reportInfo(),wb=XLSX.utils.book_new(),row=x=>[x.k,+x.s.toFixed(2),x.b===null?"No approved budget":Math.round(x.b),x.b===null?"":+(x.b-x.s).toFixed(2)];
+  const ws1=XLSX.utils.aoa_to_sheet([["RMAS Costing report"],["Period",R.period],["Scope",R.scope],["Generated",fmtDT(new Date())],[],
+    ["Region","Spent (PHP)","Approved budget (PHP)","Remaining (PHP)"],...R.regs.map(row),[],["BU","Spent (PHP)","Approved budget (PHP)","Remaining (PHP)"],...R.bus.map(row)]);
+  ws1["!cols"]=[{wch:16},{wch:16},{wch:22},{wch:16}];XLSX.utils.book_append_sheet(wb,ws1,"Summary");
+  const rows=R.list.map(r=>({"Receipt date":ymd(r.date),"Uploaded":fmtDT(r.uploadedOn),"Uploaded by":r.by,"Region":r.region,"BU":r.bu,"Outlet":r.outlet,"Vendor":r.vendor,"OR no.":r.or,"Category":r.cat,"Amount (PHP)":r.amt,"AV share":val(r,"AV"),"HA share":val(r,"HA"),"AC share":val(r,"AC"),"Purpose":r.purpose,"Late":r.late?"Yes":"","Possible duplicate":r.dup?"Yes":"","Receipt file":r.fileUrl||""}));
+  const ws2=XLSX.utils.json_to_sheet(rows.length?rows:[{"Receipt date":"No receipts"}]);ws2["!cols"]=[11,17,18,12,5,20,20,10,18,12,10,10,10,50,6,10,40].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws2,"Receipts");
+  download(R.fname+".xlsx",XLSX.write(wb,{bookType:"xlsx",type:"array"}),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Excel");};
+$("exp-pdf").onclick=()=>{if(!window.jspdf){toast("The PDF library is still loading. Try again.");return;}
+  const R=reportInfo(),doc=new window.jspdf.jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
+  const n=v=>"PHP "+v.toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2}),head={fillColor:[37,87,214]};
+  doc.setFontSize(16);doc.text("RMAS Costing report",40,44);doc.setFontSize(10);doc.setTextColor(90);
+  doc.text(`Period: ${R.period}    Scope: ${R.scope}    Generated: ${ymd(TODAY)}`,40,62);doc.setTextColor(0);
+  const spent=R.list.reduce((a,r)=>a+val(r,state.bu),0),bud=budgetFor(state.region,state.bu);
+  doc.text(`Spent: ${n(spent)}    Approved budget: ${bud===null?"No approved budget yet":n(bud)}    Remaining: ${bud===null?"-":n(bud-spent)}    Receipts: ${R.list.length}`,40,80);
+  const sumRow=x=>[x.k,n(x.s),x.b===null?"-":n(x.b),x.b===null?"-":n(x.b-x.s)];
+  doc.autoTable({startY:96,head:[["Region","Spent","Approved budget","Remaining"]],body:R.regs.map(sumRow),headStyles:head,styles:{fontSize:9},margin:{left:40,right:440}});
+  doc.autoTable({startY:96,head:[["BU","Spent","Approved budget","Remaining"]],body:R.bus.map(sumRow),headStyles:head,styles:{fontSize:9},margin:{left:440,right:40}});
+  doc.autoTable({startY:Math.max(doc.lastAutoTable.finalY,250)+20,head:[["Date","Region","BU","Outlet","Vendor / OR","Category","Purpose","Uploaded by","Amount","Notes"]],
+    body:R.list.map(r=>[ymd(r.date),r.region,r.bu,r.outlet,`${r.vendor} / ${r.or||"-"}`,r.cat,r.purpose,r.by,n(r.amt),[r.bu==="CE"?`AV ${n(val(r,"AV"))}, HA ${n(val(r,"HA"))}, AC ${n(val(r,"AC"))}`:"",r.late?"Late":"",r.dup?"Possible duplicate":""].filter(Boolean).join("; ")]),
+    headStyles:head,styles:{fontSize:7.5,cellPadding:3},columnStyles:{6:{cellWidth:160},8:{halign:"right"}},margin:{left:40,right:40}});
+  download(R.fname+".pdf",doc.output("arraybuffer"),"application/pdf","PDF");};
+
+// ================= keyboard =================
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;
+  if(!$("lb").hidden){$("lb").hidden=true;return;}
+  if(!$("overlay").hidden){closeU();return;}
+  if(!$("bud-overlay").hidden)closeBud();});
+
+// ================= demo server (only used when the file is opened outside Apps Script) =================
+const MOCK=(()=>{
+  const k=()=>Math.random().toString(16).slice(2,10)+Math.random().toString(16).slice(2,10);
+  const db={team:[{name:"RMAS Head",role:"RMAS Head",region:"",email:"head@example.com",key:"demo-head"},...REGIONS.map(r=>({name:`${r} RMAS`,role:"RMAS Team",region:r,email:"",key:k()}))],receipts:[],budgets:[],audit:[],version:"1",files:{}};
+  const now=()=>{const d=new Date();return ymd(d)+"T"+[d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(x).padStart(2,"0")).join(":");};
+  const bump=()=>db.version=String(+db.version+1);
+  const all=()=>JSON.parse(JSON.stringify({team:db.team,receipts:db.receipts,budgets:db.budgets,audit:db.audit.slice(-800),version:db.version,config:{today:ymd(new Date())},me:0,email:db.team[0].email,url:""}));
+  const audit=(action,detail,rid)=>db.audit.push({at:now(),who:db.team[0].name,action,detail,rid:rid||null});
+  return{
+    getBootstrap:all,getVersion:()=>db.version,
+    uploadReceipt(p){const or=(p.or||"").toLowerCase();const dup=or?db.receipts.find(r=>r.or.toLowerCase()===or&&r.vendor.toLowerCase()===p.vendor.toLowerCase()):null;
+      if(dup&&!p.confirmDup)return{dup:{vendor:dup.vendor,or:dup.or,amt:dup.amt,date:dup.date,by:dup.by}};if(dup)dup.dup=true;
+      const id=db.receipts.length+1,fid="f"+id;db.files[fid]={type:p.file.type,data:p.file.data};
+      db.receipts.push({id,date:p.date,uploadedOn:now(),by:db.team[0].name,region:p.region,bu:p.bu,cat:p.cat,vendor:p.vendor,outlet:p.outlet,or:p.or,amt:p.amt,purpose:p.purpose,late:daysBetween(pd(p.date),new Date())>LATE_DAYS,dup:!!dup,fileId:fid,fileUrl:"",fileType:p.file.type});
+      audit("Uploaded receipt",`${p.vendor} · OR ${p.or||"—"} · ${p.bu} · PHP ${p.amt}`,id);bump();return{ok:true,data:all()};},
+    saveBudget(p){db.budgets=db.budgets.filter(b=>b.month!==p.month);REGIONS.forEach(r=>BUS.forEach(b=>db.budgets.push({month:p.month,region:r,bu:b,amount:p.amounts[r][b],approvedBy:p.approvedBy,dateApproved:p.dateApproved})));
+      audit("Saved approved budget",`${p.month} · approved by ${p.approvedBy}`);bump();return all();},
+    saveTeam(list){list.forEach((t,i)=>{Object.assign(db.team[i],{name:t.name||db.team[i].name,email:t.email});if(i)db.team[i].region=t.region;});audit("Updated team",db.team.map(t=>t.name).join(", "));bump();return Object.assign(all(),{shareFailed:[]});},
+    logExport(kind,f){audit("Exported report",`${kind} · ${f}`);bump();return true;},
+    newKey(i){db.team[i].key=k();audit("Updated team",`New access key for ${db.team[i].name}`);bump();return all();},
+    getFileData:id=>db.files[id]||null,
+    sendTestEmail:()=>{throw new Error("Demo mode: email is only sent from Google Apps Script.");},
+  };})();
+
+// ================= start =================
+function askKey(title,msg){$("boot").hidden=false;document.querySelector("#boot .spin").hidden=true;
+  $("boot-title").textContent=title;$("boot-msg").textContent=msg;$("key-form").hidden=false;$("key-input").value="";$("key-input").focus();}
+$("key-form").addEventListener("submit",e=>{e.preventDefault();const v=$("key-input").value.trim();if(!v)return;
+  ACCESS_KEY=v;try{localStorage.setItem('rmas_costing_key',v);}catch(_){}$("key-form").hidden=true;document.querySelector("#boot .spin").hidden=false;
+  $("boot-title").textContent="Loading RMAS Costing";$("boot-msg").textContent="Checking your access key…";boot();});
+$("logout").onclick=()=>{try{localStorage.removeItem('rmas_costing_key');}catch(_){}ACCESS_KEY="";me=-1;
+  try{history.replaceState(null,"",SITE_URL());}catch(_){}askKey("Switch user","Paste the access key from your personal link.");};
+let started=false;
+async function boot(){
+  if(LIVE&&!ACCESS_KEY){askKey("Welcome to RMAS Costing","Open the app with your personal link, or paste your access key below.");return;}
+  try{
+    const d=await call("getBootstrap");
+    if(d.config&&d.config.today)TODAY=pd(d.config.today);
+    if(!started){initFilters();started=true;}
+    applyData(d);showPage(state.page||"dashboard");$("boot").hidden=true;
+  }catch(err){const m=errText(err);
+    if(isKeyError(m)){try{localStorage.removeItem('rmas_costing_key');}catch(_){}askKey("Access key not recognized",m);return;}
+    $("boot-title").textContent="Couldn't load RMAS Costing";$("boot-msg").textContent=m;document.querySelector("#boot .spin").hidden=true;}}
+boot();
+</script>
+</body>
+</html>

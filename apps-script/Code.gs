@@ -264,14 +264,23 @@ function monthReceiptsXlsx_(y, m) {
 function setup() {
   const ss = SpreadsheetApp.getActive();
   ss.setSpreadsheetTimeZone(APP.TZ);
+
+  // upgrade tabs made by the earlier (Google-login) version of this script
+  const dropCol = (name, col, label) => {
+    const sh = ss.getSheetByName(name);
+    if (sh && sh.getLastColumn() >= col && String(sh.getRange(1, col).getValue()) === label) sh.deleteColumn(col);
+  };
+  dropCol("Receipts", 5, "Uploader email");
+  dropCol("Audit", 3, "Email");
+
   Object.keys(SHEETS).forEach(name => {
     let sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
-    if (sh.getLastRow() === 0) {
-      sh.appendRow(SHEETS[name]);
-      sh.setFrozenRows(1);
-      sh.getRange(1, 1, 1, SHEETS[name].length).setFontWeight("bold").setBackground("#e8efff");
-    }
+    const hdr = SHEETS[name];
+    const current = sh.getLastColumn() ? sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), hdr.length)).getValues()[0] : [];
+    if (hdr.some((h, i) => current[i] !== h)) sh.getRange(1, 1, 1, hdr.length).setValues([hdr]); // write/repair the header row
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, hdr.length).setFontWeight("bold").setBackground("#e8efff");
   });
   ["Sheet1", "Sheet 1"].forEach(nm => { const s = ss.getSheetByName(nm); if (s && s.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(s); });
 
@@ -282,10 +291,18 @@ function setup() {
   sheet_("Budgets").getRange("A:A").setNumberFormat("@");
   sheet_("Budgets").getRange("D:D").setNumberFormat("#,##0");
 
-  if (sheet_("Team").getLastRow() === 1) {
+  const teamSh = sheet_("Team");
+  if (teamSh.getLastRow() === 1) {
     const rows = [[1, "RMAS Head", "RMAS Head", "All regions", Session.getEffectiveUser().getEmail(), makeKey_()]];
     APP.REGIONS.forEach((r, i) => rows.push([i + 2, `${r} RMAS`, "RMAS Team", r, "", makeKey_()]));
     writeTeam_(rows);
+  } else {
+    // give an access key to every user who doesn't have one yet
+    const n = teamSh.getLastRow() - 1;
+    const keys = teamSh.getRange(2, 6, n, 1).getValues();
+    let changed = false;
+    keys.forEach((r, i) => { if (!String(r[0]).trim() && String(teamSh.getRange(i + 2, 2).getValue()).trim()) { r[0] = makeKey_(); changed = true; } });
+    if (changed) teamSh.getRange(2, 6, n, 1).setValues(keys);
   }
 
   if (!getSetting_("folderId")) {
